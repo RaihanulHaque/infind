@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=infind
+GenericName=Content search
+Comment=Describe it. Find it. Search your files by what is in them.
+Exec=@BIN@/infind-gui
+Icon=infind
+Terminal=false
+Categories=Utility;
+Keywords=search;find;files;semantic;ai;
+StartupWMClass=infind

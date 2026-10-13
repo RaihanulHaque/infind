@@ -1,0 +1,18 @@
+# Changelog
+
+## 0.2.0 (2026-10-13)
+
+- Window: Up/Down to move through results, Enter opens the highlighted one, highlighted row.
+- OCR: scanned PDFs are read with tesseract; images also keep the words they contain.
+- Picture-only PDFs are embedded as page images.
+- Audio: wav, mp3 and flac in 30 second overlapping windows, opened at the second.
+- Video: the sound in windows plus up to 30 frames.
+- Folder watcher (`infind watch`, and automatically in the window).
+- `scripts/install.sh`, launcher entry, icon; GNOME shortcut added without replacing others.
+- `infind status` lists followed folders. Index records an extraction version so files an
+  older version could not read are looked at again once.
+- 13 unit tests.
+
+## 0.1.0 (2026-10-13)
+
+- First version: text, PDF and image indexing, search with exact-word boost, a window.
