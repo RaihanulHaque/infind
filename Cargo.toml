@@ -1,6 +1,6 @@
 [package]
 name = "infind"
-version = "0.2.0"
+version = "0.3.0"
 repository = "https://github.com/RaihanulHaque/infind"
 readme = "README.md"
 edition = "2021"
@@ -30,6 +30,8 @@ egui_extras = { version = "0.36", features = ["image", "file"] }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "bmp"] }
 open = "5"
 notify = "8"
+ureq = "2"
+sha2 = "0.10"
 
 [profile.release]
 opt-level = 3

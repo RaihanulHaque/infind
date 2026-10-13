@@ -45,28 +45,46 @@ a result containing every word of your query gets a score boost and a `*` mark.
 Key and credential files (`id_rsa`, `*.pem`, `.env`, ...), hidden folders, `.gitignore`d
 files and build folders are never read.
 
-## Quick start
+## Install
 
-Needs Ubuntu or another Linux with a C/C++ toolchain, CMake, Rust, `poppler-utils`,
-`tesseract-ocr` and `ffmpeg`. infind uses [kiln](https://github.com/RaihanulHaque/kiln)
-for the model runtime, built next to this folder.
+**From a release (no build tools needed).** Download `infind-<version>-linux-x86_64.tar.gz`
+from the [Releases](https://github.com/RaihanulHaque/infind/releases) page, then:
 
 ```bash
-sudo apt install poppler-utils tesseract-ocr ffmpeg evince
-
-# 1. the model runtime and the embedding model (about 1 GB with image and audio encoders)
-git clone --recursive https://github.com/RaihanulHaque/kiln ../kiln
-(cd ../kiln && cmake --preset host && cmake --build --preset host -j && scripts/fetch_models.sh --media)
-
-# 2. infind
-cargo build --release
-scripts/install.sh            # ~/.local/bin, launcher entry, Ctrl+Super shortcut on GNOME
+tar xzf infind-*-linux-x86_64.tar.gz && cd infind-*-linux-x86_64
+./install.sh
 ```
 
-Then:
+**From source.** Needs Rust, CMake and a C++ compiler. The model runtime
+([kiln](https://github.com/RaihanulHaque/kiln) over llama.cpp) is a submodule and is built by
+`cargo`; there is nothing else to set up.
 
 ```bash
-infind index ~/Documents ~/Pictures     # first run: seconds for text, a few seconds per image
+git clone --recursive https://github.com/RaihanulHaque/infind
+cd infind
+scripts/install.sh
+```
+
+Both put `infind` and `infind-gui` in `~/.local/bin`, add a launcher entry and icon, and
+(on GNOME) bind **Ctrl+Super** to the window.
+
+**Optional tools.** PDFs, scanned pages, audio and video use standard programs. Text and
+images work without them.
+
+```bash
+sudo apt install poppler-utils tesseract-ocr ffmpeg
+```
+
+**The model.** The first time infind needs it, it downloads EmbeddingGemma 2 (about 865 MB:
+310 MB of text model and 555 MB of image and audio encoders) into
+`~/.local/share/infind/models`, with progress shown, resume after an interruption and a
+SHA-256 check. `infind models` fetches it ahead of time. Use `--mmproj none` to skip the
+555 MB of image and audio encoders.
+
+## First search
+
+```bash
+infind index ~/Documents ~/Pictures     # seconds for text, a few seconds per image
 infind search photo of my passport
 infind-gui                              # or press Ctrl+Super
 ```
@@ -91,7 +109,7 @@ files update the index within a couple of seconds.
 
 ## Status
 
-Version 0.2. Verified on Ubuntu 24.04, x86_64, GNOME 47 on X11, CPU only
+Version 0.3. Verified on Ubuntu 24.04, x86_64, GNOME 47 on X11, CPU only
 (Ryzen 5 8500G), with EmbeddingGemma 2 Q8_0 on 2026-10-13:
 
 | Area | Result |
@@ -100,9 +118,12 @@ Version 0.2. Verified on Ubuntu 24.04, x86_64, GNOME 47 on X11, CPU only
 | Text, PDF, image, scanned PDF, audio, video indexing | each tried on real files and found by a plain-words query |
 | Folder watcher | create, edit, new subfolder, delete, hidden folder ignored |
 | Window | renders, searches, thumbnails, keyboard selection |
+| Build from the submodule | `cargo build` builds kiln and llama.cpp, about 3 minutes on 12 cores |
+| Bundle | `scripts/package.sh` output installed into a clean home and run |
+| Model download | resume and checksum paths tested against a local server; the published SHA-256 values match; a full 865 MB download was not completed on the test machine (slow link) |
 
-Not verified: Wayland sessions, other distributions, GPUs, folders with hundreds of
-thousands of files.
+Not verified: Wayland sessions, other distributions, Windows, GPUs, folders with hundreds
+of thousands of files, the GitHub release workflow until a tag has run it.
 
 Known limits:
 

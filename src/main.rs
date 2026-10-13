@@ -6,7 +6,7 @@ use infind::embedder::{Embedder, Kind};
 use infind::indexer::{self, Event, Options};
 use infind::store::Store;
 use infind::watch::FsWatch;
-use infind::{default_db, locator_label, resolve_model};
+use infind::{default_db, locator_label, models, resolve_model};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -79,6 +79,8 @@ enum Cmd {
     },
     /// Show what is in the index
     Status,
+    /// Download the embedding model now (otherwise it is fetched the first time it is needed)
+    Models,
 }
 
 fn main() -> Result<()> {
@@ -86,6 +88,13 @@ fn main() -> Result<()> {
     let db = cli.db.clone().unwrap_or_else(default_db);
     match &cli.cmd {
         Cmd::Status => status(&db),
+        Cmd::Models => {
+            let (m, p) = resolve(&cli, true)?;
+            println!("model:     {}", m.display());
+            println!("projector: {}", p.map(|p| p.display().to_string()).unwrap_or_else(|| "(none)".into()));
+            println!("folder:    {}", models::models_dir().display());
+            Ok(())
+        }
         Cmd::Search { query, limit, boost, json } => search(&cli, &db, &query.join(" "), *limit, *boost, *json),
         Cmd::Index { paths, kinds, force } => index(&cli, &db, paths, kinds.options(*force)),
         Cmd::Watch { paths, kinds } => watch(&cli, &db, paths, kinds.options(false)),
@@ -112,8 +121,25 @@ fn status(db: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Finds the model files, downloading the defaults on first run with a progress line.
+fn resolve(cli: &Cli, want_media: bool) -> Result<(PathBuf, Option<PathBuf>)> {
+    let mut shown = false;
+    let r = resolve_model(cli.model.clone(), cli.mmproj.clone(), want_media, &mut |p| {
+        if !shown {
+            eprintln!("first run: downloading the search model (about 865 MB, once)");
+            shown = true;
+        }
+        let pct = if p.total > 0 { p.done * 100 / p.total } else { 0 };
+        eprint!("\r  {:<36} {} ({pct}%)   ", p.file, models::human(p.done, p.total));
+        if p.done >= p.total {
+            eprintln!();
+        }
+    })?;
+    Ok(r)
+}
+
 fn load_embedder(cli: &Cli, want_media: bool) -> Result<(Embedder, PathBuf)> {
-    let (model, mmproj) = resolve_model(cli.model.clone(), cli.mmproj.clone())?;
+    let (model, mmproj) = resolve(cli, want_media)?;
     let t = Instant::now();
     let e = Embedder::load(&model, if want_media { mmproj.as_deref() } else { None }, 2048, cli.threads)?;
     let media = match (e.supports_images, e.supports_audio) {

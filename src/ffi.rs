@@ -1,5 +1,6 @@
 //! Raw C declarations for the part of kiln.h that infind uses (embedding models only).
-//! Hand-written to mirror `kiln/include/kiln/kiln.h` 0.4.0; keep layouts in sync.
+//! Hand-written to mirror `kiln.h` (these structs are the same in kiln 0.3.1 and 0.4.0);
+//! keep layouts in sync when kiln changes them.
 #![allow(non_camel_case_types, dead_code)]
 
 use std::os::raw::{c_char, c_int};

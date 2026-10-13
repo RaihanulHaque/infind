@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0 (2026-10-13)
+
+- kiln is a git submodule built by `cargo build`; no separate build step.
+- The model downloads itself on first use (resume, SHA-256 check); `infind models`.
+- `scripts/package.sh` and `scripts/install.sh` work from a release bundle or a checkout;
+  the runtime library installs to `~/.local/lib/infind`.
+- GitHub Actions: build and test on every push; a tag `v*` publishes a release bundle.
+- 18 unit tests, including the downloader against a local server.
+
 ## 0.2.0 (2026-10-13)
 
 - Window: Up/Down to move through results, Enter opens the highlighted one, highlighted row.

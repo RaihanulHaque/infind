@@ -5,6 +5,7 @@ pub mod embedder;
 pub mod extract;
 pub mod ffi;
 pub mod indexer;
+pub mod models;
 pub mod store;
 pub mod watch;
 
@@ -24,23 +25,45 @@ pub fn kiln_dir() -> PathBuf {
         .unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..").join("kiln"))
 }
 
-/// Picks the model and its projector from flags / environment / kiln's models folder.
-/// `mmproj = Some("none")` disables media.
-pub fn resolve_model(model: Option<PathBuf>, mmproj: Option<PathBuf>) -> anyhow::Result<(PathBuf, Option<PathBuf>)> {
-    let model = model
-        .or_else(|| std::env::var("INFIND_MODEL").ok().map(PathBuf::from))
-        .unwrap_or_else(|| kiln_dir().join("models").join("embeddinggemma-2-Q8_0.gguf"));
-    if !model.exists() {
-        anyhow::bail!("model not found: {} (set --model or INFIND_MODEL)", model.display());
-    }
-    let mmproj = mmproj.or_else(|| std::env::var("INFIND_MMPROJ").ok().map(PathBuf::from));
-    let mmproj = match mmproj {
-        Some(p) if p.as_os_str() == "none" => None,
-        Some(p) => Some(p),
-        None => {
-            let name = model.file_name().unwrap().to_string_lossy().to_string();
-            let guess = model.with_file_name(format!("mmproj-{name}"));
-            guess.exists().then_some(guess)
+/// Picks the model and its projector, downloading the defaults on first run.
+///
+/// An explicit model (flag or `INFIND_MODEL`) is used as given. Without one the default
+/// EmbeddingGemma 2 files are looked for locally and fetched if missing. The projector
+/// (image and audio encoders) is only fetched when `want_media` is true.
+/// `mmproj = Some("none")` turns media off.
+pub fn resolve_model(
+    model: Option<PathBuf>,
+    mmproj: Option<PathBuf>,
+    want_media: bool,
+    on_progress: &mut dyn FnMut(models::Progress),
+) -> anyhow::Result<(PathBuf, Option<PathBuf>)> {
+    let explicit_model = model.or_else(|| std::env::var("INFIND_MODEL").ok().map(PathBuf::from));
+    let explicit_proj = mmproj.or_else(|| std::env::var("INFIND_MMPROJ").ok().map(PathBuf::from));
+    let no_media = matches!(&explicit_proj, Some(p) if p.as_os_str() == "none") || !want_media;
+
+    let (model, is_default) = match explicit_model {
+        Some(p) => {
+            if !p.exists() {
+                anyhow::bail!("model not found: {}", p.display());
+            }
+            (p, false)
+        }
+        None => (models::ensure(&models::MODEL, on_progress)?, true),
+    };
+
+    let mmproj = if no_media {
+        None
+    } else if let Some(p) = explicit_proj {
+        Some(p)
+    } else {
+        let name = model.file_name().unwrap().to_string_lossy().to_string();
+        let beside = model.with_file_name(format!("mmproj-{name}"));
+        if beside.exists() {
+            Some(beside)
+        } else if is_default {
+            Some(models::ensure(&models::PROJECTOR, on_progress)?)
+        } else {
+            None
         }
     };
     Ok((model, mmproj))

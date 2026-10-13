@@ -23,6 +23,8 @@ enum Msg {
     Progress(String),
     /// Something the folder watcher did, or how many folders it follows.
     Watch(String),
+    /// Start-up progress: downloading or loading the model.
+    Loading(String),
     Error(String),
 }
 
@@ -43,10 +45,19 @@ fn worker(rx: Receiver<Cmd>, tx: Sender<Msg>, ctx: egui::Context) {
         let _ = tx.send(m);
         ctx.request_repaint();
     };
-    let (model, mmproj) = match resolve_model(None, None) {
+    send(Msg::Loading("loading model…".into()));
+    let (model, mmproj) = match resolve_model(None, None, true, &mut |p| {
+        let pct = if p.total > 0 { p.done * 100 / p.total } else { 0 };
+        send(Msg::Loading(format!(
+            "first run: downloading {} {} ({pct}%)",
+            p.file,
+            infind::models::human(p.done, p.total)
+        )));
+    }) {
         Ok(x) => x,
         Err(e) => return send(Msg::Error(format!("{e:#}"))),
     };
+    send(Msg::Loading("loading model…".into()));
     let model_name = model.file_name().unwrap().to_string_lossy().to_string();
     let mut store = match Store::open(&default_db()) {
         Ok(s) => s,
@@ -277,6 +288,7 @@ impl App {
                     }
                 }
                 Msg::Watch(w) => self.watch_status = w,
+                Msg::Loading(t) => self.status = t,
                 Msg::Progress(p) => {
                     self.indexing = !p.starts_with("done:");
                     self.progress = p;

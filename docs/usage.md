@@ -58,6 +58,12 @@ match; 0.7 and above is usually the thing you meant.
 
 Shows the index file, the model it was built with, counts by kind and the folders followed.
 
+### `infind models`
+
+Finds the model files, downloading them if they are missing, and prints where they are.
+Nothing else needs to be run first; every command does the same thing the first time it
+needs the model.
+
 ### `infind-gui [words]`
 
 Opens the window. Words on the command line become the first query. Only one window runs
@@ -69,11 +75,10 @@ repeatedly.
 | Flag | Variable | Default |
 |---|---|---|
 | `--db <file>` | `INFIND_DB` | `$XDG_DATA_HOME/infind/index.db`, else `~/.local/share/infind/index.db` |
-| `--model <gguf>` | `INFIND_MODEL` | `../kiln/models/embeddinggemma-2-Q8_0.gguf` |
-| `--mmproj <gguf>` | `INFIND_MMPROJ` | `mmproj-<model name>` beside the model; `none` turns media off |
+| `--model <gguf>` | `INFIND_MODEL` | EmbeddingGemma 2 Q8_0, downloaded on first use |
+| `--mmproj <gguf>` | `INFIND_MMPROJ` | its image and audio encoders, downloaded on first use; `none` turns media off |
+| | `INFIND_MODELS` | folder for downloaded models, default `~/.local/share/infind/models` |
 | `--threads <n>` | | 0, kiln chooses |
-| | `KILN_DIR` | `../kiln`, used at build time and to find the model |
-| | `KILN_LIB_DIR` | `$KILN_DIR/build/host`, where `libkiln.so` is |
 
 The index remembers which model built it. Opening it with a different model is refused
 unless you pass `--force`, because vectors from different models cannot be compared.
@@ -96,6 +101,8 @@ bind your own shortcut to `~/.local/bin/infind-gui`.
 | What | Where |
 |---|---|
 | Index | `~/.local/share/infind/index.db` (SQLite; delete it to start over) |
+| Models | `~/.local/share/infind/models/` |
+| Model runtime | `~/.local/lib/infind/libkiln.so.0` |
 | Window lock | `~/.local/share/infind/gui.lock` |
 | Temporary pages and clips | the system temp folder, removed after each file |
 | Binaries, launcher, icon | `~/.local/bin`, `~/.local/share/applications`, `~/.local/share/icons` |

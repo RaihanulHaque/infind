@@ -21,7 +21,8 @@
 | Layer | Language | Does |
 |---|---|---|
 | llama.cpp | C/C++ | runs the model |
-| kiln | C/C++ | stable C API over llama.cpp: loading, contexts, embeddings, images, audio |
+| kiln | C/C++ | stable C API over llama.cpp: loading, contexts, embeddings, images, audio; built by `build.rs` from a submodule |
+| `src/models.rs` | Rust | finds the model files, downloads them on first run |
 | `src/ffi.rs` | Rust | declares the part of that C API infind uses |
 | `src/embedder.rs` | Rust | safe wrapper: one model, one context, one vector per call |
 | `src/extract.rs`, `src/indexer.rs` | Rust | turn files into pieces and pieces into rows |
@@ -31,8 +32,9 @@
 
 ## The C boundary
 
-`libkiln.so` is linked at build time (`build.rs` adds the search path, the library and an
-rpath, so the binary runs from anywhere). Rust and C share one address space; a call is a
+`libkiln.so` is built and linked at build time (`build.rs` runs CMake on the kiln submodule,
+copies the library beside the binaries and sets run-time search paths relative to the
+binary, so it runs from the build folder, from `~/.local` or from an unpacked bundle). Rust and C share one address space; a call is a
 plain function call. Strings cross as NUL-terminated UTF-8, vectors as a pointer plus a
 length that Rust allocated, and every call returns a status integer that the wrapper turns
 into an error with kiln's own message.
