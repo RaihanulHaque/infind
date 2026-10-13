@@ -120,10 +120,11 @@ Version 0.3. Verified on Ubuntu 24.04, x86_64, GNOME 47 on X11, CPU only
 | Window | renders, searches, thumbnails, keyboard selection |
 | Build from the submodule | `cargo build` builds kiln and llama.cpp, about 3 minutes on 12 cores |
 | Bundle | `scripts/package.sh` output installed into a clean home and run |
+| GitHub Actions | CI (build, 18 tests, package) and the tag-triggered release both ran green; the published bundle downloaded, checksum-verified and needs glibc 2.34 or newer |
 | Model download | resume and checksum paths tested against a local server; the published SHA-256 values match; a full 865 MB download was not completed on the test machine (slow link) |
 
-Not verified: Wayland sessions, other distributions, Windows, GPUs, folders with hundreds
-of thousands of files, the GitHub release workflow until a tag has run it.
+Not verified: Wayland sessions, distributions other than Ubuntu, Windows, GPUs, folders
+with hundreds of thousands of files.
 
 Known limits:
 

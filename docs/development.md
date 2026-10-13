@@ -37,6 +37,10 @@ missing. `evince`, `mpv` and `vlc` are only used to open results.
 glibc) and attaches the archive and its checksum to a GitHub release. `ci.yml` builds and
 tests every push.
 
+One workaround to know: kiln's `src/probe/fast_cores.h` uses `size_t` without including
+`<cstddef>`, which GCC 11 (Ubuntu 22.04) rejects. `build.rs` passes `-include cstddef` on
+Linux. Once kiln adds the include, the flag can go.
+
 Bump the kiln submodule deliberately: `git -C third_party/kiln fetch && git -C
 third_party/kiln checkout <commit>`, rebuild, run the tests, and commit the new pointer.
 `src/ffi.rs` must match the structs in that kiln's `kiln.h`.
