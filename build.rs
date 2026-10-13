@@ -77,6 +77,16 @@ fn build_kiln(src: &Path, out: &Path) -> PathBuf {
     let build = out.join("kiln-build");
     let mut cfg = Command::new("cmake");
     cfg.arg("-S").arg(src).arg("-B").arg(&build);
+    // kiln's src/probe/fast_cores.h uses size_t without including <cstddef>. GCC 13 lets it
+    // pass, GCC 11 (Ubuntu 22.04) does not. Forcing the include is harmless everywhere on
+    // Linux and keeps old compilers working until kiln adds the line itself.
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("linux") {
+        let mut flags = std::env::var("CXXFLAGS").unwrap_or_default();
+        if !flags.contains("cstddef") {
+            flags.push_str(" -include cstddef");
+        }
+        cfg.env("CXXFLAGS", flags.trim());
+    }
     cfg.args(["-DCMAKE_BUILD_TYPE=Release", "-DKILN_BUILD_CLI=OFF", "-DKILN_BUILD_TESTS=OFF"]);
     if let Ok(extra) = std::env::var("KILN_CMAKE_ARGS") {
         cfg.args(extra.split_whitespace());
