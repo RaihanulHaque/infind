@@ -5,7 +5,13 @@
 - Search by sound: `infind search --audio <clip>` and a 🎤 button in the window that records
   from the microphone. The clip is embedded directly (no speech to text), wrapped in
   EmbeddingGemma's query prefix, and ranked against text, images and audio alike.
+- New window: a borderless search bar in the style of Spotlight and DigUp's panel. Results
+  grouped by kind with thumbnails, a preview pane (image, PDF page, video frame at the moment,
+  passage with the query's words marked), weaker matches folded away, Ctrl+Enter to show in
+  folder, a Folders view with the desktop's folder dialog, light and dark mode, Inter typeface.
 - Window: a search typed while another command was queued no longer drops that command.
+- Window: a recorder that ignores Ctrl+C is stopped with SIGTERM, then killed, instead of
+  hanging the window.
 
 ## 0.3.0 (2026-10-13)
 

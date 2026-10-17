@@ -94,20 +94,26 @@ Full details are in [docs/usage.md](docs/usage.md).
 
 ## The window
 
-`infind-gui` (Ctrl+Super after install) is a search box that searches as you type.
+`infind-gui` (Ctrl+Super after install) is a floating search bar, a fifth of the way down
+the screen. It searches as you type and grows to show the results: grouped by kind on the
+left, and on the right a preview of the highlighted one (the picture, the PDF page, the
+video frame at the moment, or the passage with your words marked). Results that match much
+less well than the best are folded under "N weaker matches". It follows the desktop's
+light or dark mode and puts itself away when you click elsewhere.
 
 | Key | Does |
 |---|---|
 | type | search after a short pause |
 | Up / Down | move the highlight |
 | Enter | open the highlighted result (PDFs at the page, media at the second) |
-| Esc | close |
+| Ctrl+Enter | show it in its folder |
+| Esc | close (or leave the Folders view) |
 | right-click a row | Open, Show in folder, Copy path |
-| 🎤 button | click, speak or play a sound, click again: searches with the clip (30 s at most) |
+| 🎤 button | click, speak or play a sound, then click again or press Enter: searches with the clip (30 s at most) |
+| folder button | the folders being searched: add one (the desktop's folder dialog), or update one now |
 
-The bottom bar indexes a folder with one click and shows what the folder watcher is
-doing. Folders you have indexed are followed automatically: new, edited and deleted
-files update the index within a couple of seconds.
+Folders you have indexed are followed automatically: new, edited and deleted files update
+the index within a couple of seconds.
 
 ## Status
 
@@ -160,4 +166,6 @@ ranked by dot product.
 ## License
 
 MIT. See [LICENSE](LICENSE). The model (EmbeddingGemma 2, Apache 2.0) and llama.cpp (MIT)
-keep their own licenses. infind is not affiliated with Google or with DigUp.
+keep their own licenses. The window uses the Inter typeface (SIL Open Font License, see
+[assets/fonts/Inter-LICENSE.txt](assets/fonts/Inter-LICENSE.txt)); its layout follows DigUp's
+search panel. infind is not affiliated with Google or with DigUp.

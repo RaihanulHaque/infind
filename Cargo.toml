@@ -16,7 +16,7 @@ path = "src/main.rs"
 
 [[bin]]
 name = "infind-gui"
-path = "src/bin/infind-gui.rs"
+path = "src/bin/infind-gui/main.rs"
 
 [dependencies]
 anyhow = "1"

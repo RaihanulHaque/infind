@@ -59,9 +59,10 @@ src/store.rs          SQLite schema, search
 src/watch.rs          inotify watcher
 src/lib.rs            shared helpers (paths, model lookup, locator words)
 src/main.rs           CLI
-src/bin/infind-gui.rs window (egui / eframe)
+src/bin/infind-gui/   window (egui / eframe): main.rs the panel, worker.rs the model and
+                      preview threads, mic.rs recording, look.rs font, colors, icons
 scripts/install.sh    install binaries, launcher entry, GNOME shortcut
-assets/               icon and desktop entry
+assets/               icon, desktop entry, the Inter font the window embeds
 ```
 
 ## Tests

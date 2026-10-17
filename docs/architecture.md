@@ -28,7 +28,7 @@
 | `src/extract.rs`, `src/indexer.rs` | Rust | turn files into pieces and pieces into rows |
 | `src/store.rs` | Rust | SQLite schema, incremental bookkeeping, search |
 | `src/watch.rs` | Rust | inotify watcher with settle time |
-| `src/main.rs`, `src/bin/infind-gui.rs` | Rust | command line and window |
+| `src/main.rs`, `src/bin/infind-gui/` | Rust | command line and window |
 
 ## The C boundary
 
