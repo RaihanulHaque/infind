@@ -3,10 +3,19 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build-test:
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            artifact: infind-linux-x86_64
+          - os: macos-14   # Apple silicon
+            artifact: infind-macos-arm64
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -21,6 +30,6 @@ jobs:
         run: scripts/package.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: infind-linux-x86_64
+          name: ${{ matrix.artifact }}
           path: dist/*.tar.gz
           retention-days: 7

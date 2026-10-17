@@ -91,10 +91,10 @@ searched like `--audio` and deleted afterwards. It uses `arecord` (alsa-utils), 
 
 | Flag | Variable | Default |
 |---|---|---|
-| `--db <file>` | `INFIND_DB` | `$XDG_DATA_HOME/infind/index.db`, else `~/.local/share/infind/index.db` |
+| `--db <file>` | `INFIND_DB` | `index.db` in the data folder (see Where things live) |
 | `--model <gguf>` | `INFIND_MODEL` | EmbeddingGemma 2 Q8_0, downloaded on first use |
 | `--mmproj <gguf>` | `INFIND_MMPROJ` | its image and audio encoders, downloaded on first use; `none` turns media off |
-| | `INFIND_MODELS` | folder for downloaded models, default `~/.local/share/infind/models` |
+| | `INFIND_MODELS` | folder for downloaded models, default `models` in the data folder |
 | `--threads <n>` | | 0, kiln chooses |
 
 The index remembers which model built it. Opening it with a different model is refused
@@ -117,15 +117,19 @@ bind your own shortcut to `~/.local/bin/infind-gui`.
 
 | What | Where |
 |---|---|
-| Index | `~/.local/share/infind/index.db` (SQLite; delete it to start over) |
-| Models | `~/.local/share/infind/models/` |
-| Model runtime | `~/.local/lib/infind/libkiln.so.0` |
-| Window lock | `~/.local/share/infind/gui.lock` |
-| Temporary pages and clips | the system temp folder, removed after each file |
-| Binaries, launcher, icon | `~/.local/bin`, `~/.local/share/applications`, `~/.local/share/icons` |
+| What | Linux | macOS |
+|---|---|---|
+| Index (SQLite; delete it to start over) | `~/.local/share/infind/index.db` | `~/Library/Application Support/infind/index.db` |
+| Models | `~/.local/share/infind/models/` | `~/Library/Application Support/infind/models/` |
+| Model runtime | `~/.local/lib/infind/libkiln.so.0` | inside `infind.app` |
+| Window lock | `~/.local/share/infind/gui.lock` | `~/Library/Application Support/infind/gui.lock` |
+| Temporary pages and clips | the system temp folder, removed after each file | the same |
+| Programs | `~/.local/bin`, `~/.local/share/applications`, `~/.local/share/icons` | `~/Applications/infind.app`, links in `~/.local/bin` |
 
-To uninstall: remove those files and delete the `infind` entry from Settings, Keyboard,
-Custom Shortcuts.
+`$XDG_DATA_HOME`, when set, replaces the data folder on both.
+
+To uninstall: remove those files. On Linux also delete the `infind` entry from Settings,
+Keyboard, Custom Shortcuts; on macOS the shortcut you made in Shortcuts.
 
 ## Opening results
 

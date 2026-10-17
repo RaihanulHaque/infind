@@ -2,7 +2,7 @@
 //!
 //! Lookup order for the default model:
 //!   1. `--model` / `INFIND_MODEL` (used as given, never downloaded)
-//!   2. `$INFIND_MODELS`, else `$XDG_DATA_HOME/infind/models`
+//!   2. `$INFIND_MODELS`, else the `models` folder in [`crate::data_dir`]
 //!   3. a kiln checkout's `models` folder (development)
 //!   4. download into (2), verified by size and SHA-256
 
@@ -46,11 +46,7 @@ pub fn models_dir() -> PathBuf {
     if let Ok(d) = std::env::var("INFIND_MODELS") {
         return PathBuf::from(d);
     }
-    if let Ok(x) = std::env::var("XDG_DATA_HOME") {
-        return PathBuf::from(x).join("infind").join("models");
-    }
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    PathBuf::from(home).join(".local/share/infind/models")
+    crate::data_dir().join("models")
 }
 
 /// Where a spec's file is on this machine already, if anywhere.

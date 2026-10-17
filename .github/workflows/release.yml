@@ -7,9 +7,12 @@ permissions:
   contents: write
 
 jobs:
-  linux:
-    # An older runner on purpose: the bundle then runs on any newer glibc.
-    runs-on: ubuntu-22.04
+  build:
+    strategy:
+      matrix:
+        # An older Linux runner on purpose: the bundle then runs on any newer glibc.
+        os: [ubuntu-22.04, macos-14]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -17,7 +20,20 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Package
         run: scripts/package.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle-${{ matrix.os }}
+          path: dist/*
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/*.sha256 --generate-notes --title "infind $GITHUB_REF_NAME"
+        run: gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/*.sha256 --repo "$GITHUB_REPOSITORY" --generate-notes --title "infind $GITHUB_REF_NAME"

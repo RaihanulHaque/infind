@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>infind</string>
+	<key>CFBundleDisplayName</key>
+	<string>infind</string>
+	<key>CFBundleIdentifier</key>
+	<string>io.github.raihanulhaque.infind</string>
+	<key>CFBundleExecutable</key>
+	<string>infind-gui</string>
+	<key>CFBundleIconFile</key>
+	<string>infind</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>@VERSION@</string>
+	<key>CFBundleVersion</key>
+	<string>@VERSION@</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>12.0</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.utilities</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>infind listens only while the microphone button is on, to search your files with what you say or play. Nothing leaves this Mac.</string>
+</dict>
+</plist>

@@ -1201,10 +1201,18 @@ fn open_hit(h: &HitView) {
 }
 
 fn show_in_folder(h: &HitView) {
+    // The Finder can select the file itself; elsewhere the folder opens.
+    if cfg!(target_os = "macos") {
+        if let Ok(c) = std::process::Command::new("open").arg("-R").arg(&h.path).spawn() {
+            drop(c);
+            return;
+        }
+    }
     let _ = open::that_detached(&h.dir);
 }
 
 fn main() -> eframe::Result {
+    infind::add_tool_paths();
     // One window at a time, and the shortcut toggles it: a second launch closes the open
     // window (whose process id is in the lock file) and exits.
     let lock_path = default_db().with_file_name("gui.lock");

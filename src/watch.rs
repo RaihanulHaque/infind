@@ -1,4 +1,5 @@
-//! Watches indexed folders (inotify) and reports files that changed, after they settle.
+//! Watches indexed folders (inotify on Linux, FSEvents on macOS) and reports files that
+//! changed, after they settle.
 
 use anyhow::Result;
 use notify::{EventKind, RecursiveMode, Watcher};
@@ -15,7 +16,7 @@ pub struct FsWatch {
     rx: Receiver<notify::Result<notify::Event>>,
     roots: Vec<PathBuf>,
     pending: HashMap<PathBuf, Instant>,
-    /// Folders that could not be watched (permission, inotify limit), with the reason.
+    /// Folders that could not be watched (permission, the inotify limit), with the reason.
     pub failed: Vec<(PathBuf, String)>,
 }
 

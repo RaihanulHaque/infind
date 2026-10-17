@@ -307,14 +307,20 @@ fn render_pdf_page(path: &Path, page: i64, out: &Path) -> bool {
     ok && out.exists()
 }
 
-/// Asks for a folder with the desktop's own dialog (zenity on GNOME, kdialog on KDE).
-/// Returns false when neither is installed; otherwise the answer arrives as Msg::Picked.
+/// Asks for a folder with the desktop's own dialog (zenity on GNOME, kdialog on KDE, the
+/// Finder's on macOS). Returns false when there is none; otherwise the answer arrives as
+/// Msg::Picked.
 pub fn pick_folder(tx: Sender<Msg>, ctx: egui::Context) -> bool {
     let home = std::env::var("HOME").unwrap_or_else(|_| "/".into());
-    let tries: [(&str, Vec<String>); 2] = [
-        ("zenity", vec!["--file-selection".into(), "--directory".into(), "--title=Choose a folder to search".into()]),
-        ("kdialog", vec!["--getexistingdirectory".into(), home]),
-    ];
+    let tries: Vec<(&str, Vec<String>)> = if cfg!(target_os = "macos") {
+        let script = r#"POSIX path of (choose folder with prompt "Choose a folder to search")"#;
+        vec![("osascript", vec!["-e".into(), script.into()])]
+    } else {
+        vec![
+            ("zenity", vec!["--file-selection".into(), "--directory".into(), "--title=Choose a folder to search".into()]),
+            ("kdialog", vec!["--getexistingdirectory".into(), home]),
+        ]
+    };
     for (prog, args) in tries {
         if !extract::have(prog) {
             continue;

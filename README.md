@@ -5,7 +5,7 @@
 <h1 align="center">infind</h1>
 
 <p align="center"><b>Describe it. Find it.</b><br>
-On-device content search for Linux. Find files by what is in them, not what they are called.</p>
+On-device content search for Linux (and macOS, from source). Find files by what is in them, not what they are called.</p>
 
 ---
 
@@ -68,16 +68,33 @@ scripts/install.sh
 Both put `infind` and `infind-gui` in `~/.local/bin`, add a launcher entry and icon, and
 (on GNOME) bind **Ctrl+Super** to the window.
 
+**macOS (Apple silicon, from source; not yet tried on a real Mac).** The same commands, with
+the build tools from Homebrew:
+
+```bash
+xcode-select --install          # the C++ compiler
+brew install rust cmake
+git clone --recursive https://github.com/RaihanulHaque/infind
+cd infind
+scripts/install.sh
+```
+
+This makes `~/Applications/infind.app` (the window; the model runs on the GPU through
+Metal) and links `infind` into `~/.local/bin`. macOS has no shortcut a program can claim
+on its own: open the Shortcuts app, make a shortcut with the action *Open App → infind*,
+and give it a key in its details. The microphone button asks for permission the first time.
+
 **Optional tools.** PDFs, scanned pages, audio and video use standard programs. Text and
 images work without them.
 
 ```bash
-sudo apt install poppler-utils tesseract-ocr ffmpeg
+sudo apt install poppler-utils tesseract-ocr ffmpeg     # Linux
+brew install poppler tesseract ffmpeg                   # macOS
 ```
 
 **The model.** The first time infind needs it, it downloads EmbeddingGemma 2 (about 865 MB:
 310 MB of text model and 555 MB of image and audio encoders) into
-`~/.local/share/infind/models`, with progress shown, resume after an interruption and a
+`~/.local/share/infind/models` (on macOS `~/Library/Application Support/infind/models`), with progress shown, resume after an interruption and a
 SHA-256 check. `infind models` fetches it ahead of time. Use `--mmproj none` to skip the
 555 MB of image and audio encoders.
 

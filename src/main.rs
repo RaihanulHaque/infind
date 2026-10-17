@@ -13,7 +13,8 @@ use std::time::{Duration, Instant};
 #[derive(Parser)]
 #[command(name = "infind", version, about = "Describe it. Find it. On-device content search.")]
 struct Cli {
-    /// Index file (default: $XDG_DATA_HOME/infind/index.db)
+    /// Index file (default: index.db in $XDG_DATA_HOME/infind, ~/.local/share/infind or
+    /// ~/Library/Application Support/infind)
     #[arg(long, global = true, env = "INFIND_DB")]
     db: Option<PathBuf>,
     /// Embedding model GGUF (default: kiln/models/embeddinggemma-2-Q8_0.gguf)
@@ -90,6 +91,7 @@ enum Cmd {
 }
 
 fn main() -> Result<()> {
+    infind::add_tool_paths();
     let cli = Cli::parse();
     let db = cli.db.clone().unwrap_or_else(default_db);
     match &cli.cmd {

@@ -1,4 +1,4 @@
-//! infind: describe it, find it. On-device content search for Linux.
+//! infind: describe it, find it. On-device content search for Linux and macOS.
 //! Library part shared by the CLI (`infind`) and the window (`infind-gui`).
 
 pub mod embedder;
@@ -11,12 +11,40 @@ pub mod watch;
 
 use std::path::{Path, PathBuf};
 
-pub fn default_db() -> PathBuf {
+/// Where infind keeps its index and models: `$XDG_DATA_HOME/infind` when set, else
+/// `~/.local/share/infind` on Linux and `~/Library/Application Support/infind` on macOS.
+pub fn data_dir() -> PathBuf {
     if let Ok(x) = std::env::var("XDG_DATA_HOME") {
-        return PathBuf::from(x).join("infind").join("index.db");
+        return PathBuf::from(x).join("infind");
     }
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    PathBuf::from(home).join(".local/share/infind/index.db")
+    let home = PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| ".".into()));
+    if cfg!(target_os = "macos") {
+        home.join("Library/Application Support/infind")
+    } else {
+        home.join(".local/share/infind")
+    }
+}
+
+pub fn default_db() -> PathBuf {
+    data_dir().join("index.db")
+}
+
+/// A Mac app opened from Finder or the Dock gets a PATH without Homebrew, where ffmpeg,
+/// pdftotext and tesseract live. Adds those folders when they exist and are missing.
+pub fn add_tool_paths() {
+    if !cfg!(target_os = "macos") {
+        return;
+    }
+    let mut paths: Vec<PathBuf> = std::env::var_os("PATH").map(|p| std::env::split_paths(&p).collect()).unwrap_or_default();
+    for extra in ["/opt/homebrew/bin", "/usr/local/bin"] {
+        let extra = PathBuf::from(extra);
+        if extra.is_dir() && !paths.contains(&extra) {
+            paths.push(extra);
+        }
+    }
+    if let Ok(joined) = std::env::join_paths(paths) {
+        std::env::set_var("PATH", joined);
+    }
 }
 
 pub fn kiln_dir() -> PathBuf {

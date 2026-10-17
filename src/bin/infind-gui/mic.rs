@@ -5,10 +5,29 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
+/// Recorders to try, in order; each takes the output file as its last argument and
+/// finishes the file when it gets Ctrl+C.
+#[cfg(not(target_os = "macos"))]
+const RECORDERS: [(&str, &[&str]); 2] = [
+    ("arecord", &["-q", "-f", "S16_LE", "-r", "16000", "-c", "1"]),
+    ("pw-record", &["--rate", "16000", "--channels", "1", "--format", "s16"]),
+];
+#[cfg(not(target_os = "macos"))]
+const NO_RECORDER: &str = "Recording needs arecord (alsa-utils) or pw-record (PipeWire).";
+
+#[cfg(target_os = "macos")]
+const RECORDERS: [(&str, &[&str]); 2] = [
+    ("ffmpeg", &["-loglevel", "quiet", "-f", "avfoundation", "-i", ":0", "-ac", "1", "-ar", "16000", "-y"]),
+    ("rec", &["-q", "-c", "1", "-r", "16000", "-b", "16"]),
+];
+#[cfg(target_os = "macos")]
+const NO_RECORDER: &str = "Recording needs ffmpeg or sox: brew install ffmpeg";
+
 /// Longest clip recorded: the model hears 30 seconds at a time.
 pub const MAX_CLIP: Duration = Duration::from_secs(30);
 
-/// A microphone recording in progress: arecord or pw-record writing a 16 kHz mono wav.
+/// A microphone recording in progress: a recorder writing a 16 kHz mono wav (arecord or
+/// pw-record on Linux; ffmpeg or sox on macOS).
 pub struct Recording {
     child: std::process::Child,
     /// Taken by `finish`; while still here, dropping the recording discards it.
@@ -20,11 +39,7 @@ impl Recording {
     pub fn start() -> Result<Self, String> {
         let dir = TempDir::new("mic").map_err(|e| format!("{e:#}"))?;
         let wav = dir.path().join("clip.wav");
-        let tries: [(&str, &[&str]); 2] = [
-            ("arecord", &["-q", "-f", "S16_LE", "-r", "16000", "-c", "1"]),
-            ("pw-record", &["--rate", "16000", "--channels", "1", "--format", "s16"]),
-        ];
-        for (prog, args) in tries {
+        for (prog, args) in RECORDERS {
             let spawned = Command::new(prog)
                 .args(args)
                 .arg(&wav)
@@ -36,7 +51,7 @@ impl Recording {
                 return Ok(Self { child, dir: Some(dir), started: Instant::now() });
             }
         }
-        Err("Recording needs arecord (alsa-utils) or pw-record (PipeWire).".into())
+        Err(NO_RECORDER.into())
     }
 
     /// Stops the recorder as Ctrl+C would, so it finishes the wav, and returns the clip.

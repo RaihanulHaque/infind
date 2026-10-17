@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- macOS (Apple silicon) builds from source: `scripts/install.sh` makes `~/Applications/infind.app`
+  with the runtime inside, data lives in `~/Library/Application Support/infind`, Homebrew's
+  tools are found when the app is opened from Finder, the microphone records with ffmpeg
+  (or sox), folders are chosen in the Finder's dialog, and Show in folder selects the file.
+  CI builds, tests and packages on macOS 14 as well; a tag also publishes a macOS bundle.
+
 - Search by sound: `infind search --audio <clip>` and a 🎤 button in the window that records
   from the microphone. The clip is embedded directly (no speech to text), wrapped in
   EmbeddingGemma's query prefix, and ranked against text, images and audio alike.

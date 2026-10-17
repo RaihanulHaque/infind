@@ -2,14 +2,27 @@
 //
 //   default            build third_party/kiln (a git submodule) with CMake into OUT_DIR
 //   KILN_DIR=<path>    build that kiln checkout instead of the submodule
-//   KILN_LIB_DIR=<dir> skip building; link the libkiln.so that is in <dir>
+//   KILN_LIB_DIR=<dir> skip building; link the libkiln.so (libkiln.dylib on macOS) in <dir>
 //
 // The built library is copied next to the binaries (target/<profile>/), and the binaries
-// look for it in $ORIGIN, $ORIGIN/../lib and $ORIGIN/../lib/infind, so a plain
-// `cargo build` runs from the target folder and an installed or unpacked copy runs from
-// wherever it is put.
+// look for it beside themselves and in ../lib and ../lib/infind (on macOS also in an app
+// bundle's ../Frameworks), so a plain `cargo build` runs from the target folder and an
+// installed or unpacked copy runs from wherever it is put.
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+/// libkiln.so* on Linux, libkiln*.dylib on macOS.
+fn is_kiln_lib(name: &str) -> bool {
+    if macos() {
+        name.starts_with("libkiln") && name.ends_with(".dylib")
+    } else {
+        name.starts_with("libkiln.so")
+    }
+}
+
+fn macos() -> bool {
+    std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos")
+}
 
 fn main() {
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
@@ -36,7 +49,7 @@ fn main() {
         if let Ok(rd) = std::fs::read_dir(&lib_dir) {
             for e in rd.flatten() {
                 let name = e.file_name().to_string_lossy().to_string();
-                if name.starts_with("libkiln.so") {
+                if is_kiln_lib(&name) {
                     let _ = std::fs::copy(e.path(), profile_dir.join(&name));
                 }
             }
@@ -45,10 +58,15 @@ fn main() {
 
     println!("cargo:rustc-link-search=native={}", lib_dir.display());
     println!("cargo:rustc-link-lib=dylib=kiln");
-    println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN");
-    println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN/../lib");
-    println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN/../lib/infind");
-    println!("cargo:rustc-link-arg=-Wl,-rpath,{}", lib_dir.display());
+    let here = if macos() { "@executable_path" } else { "$ORIGIN" };
+    let mut rpaths = vec![here.to_string(), format!("{here}/../lib"), format!("{here}/../lib/infind")];
+    if macos() {
+        rpaths.push(format!("{here}/../Frameworks"));
+    }
+    rpaths.push(lib_dir.display().to_string());
+    for r in rpaths {
+        println!("cargo:rustc-link-arg=-Wl,-rpath,{r}");
+    }
 }
 
 fn build_kiln(src: &Path, out: &Path) -> PathBuf {
@@ -56,7 +74,7 @@ fn build_kiln(src: &Path, out: &Path) -> PathBuf {
         panic!(
             "kiln sources not found at {}.\n\
              Fetch them with:  git submodule update --init --recursive\n\
-             or point KILN_DIR at a kiln checkout, or KILN_LIB_DIR at a built libkiln.so.",
+             or point KILN_DIR at a kiln checkout, or KILN_LIB_DIR at a built libkiln.",
             src.display()
         );
     }
@@ -98,12 +116,13 @@ fn build_kiln(src: &Path, out: &Path) -> PathBuf {
     b.arg("--build").arg(&build).args(["--target", "kiln", "--config", "Release", "-j", &jobs]);
     run(&mut b, "build kiln");
 
+    let lib = if macos() { "libkiln.dylib" } else { "libkiln.so" };
     for cand in [build.clone(), build.join("Release")] {
-        if cand.join("libkiln.so").exists() {
+        if cand.join(lib).exists() {
             return cand;
         }
     }
-    panic!("kiln built, but libkiln.so was not found under {}", build.display());
+    panic!("kiln built, but {lib} was not found under {}", build.display());
 }
 
 fn run(cmd: &mut Command, what: &str) {
