@@ -28,6 +28,16 @@ jobs:
         run: cargo test --release
       - name: Package
         run: scripts/package.sh
+      - name: Install the app and run it (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          scripts/install.sh
+          test -x ~/Applications/infind.app/Contents/MacOS/infind-gui
+          ~/Applications/infind.app/Contents/MacOS/infind --version
+          ~/.local/bin/infind status
+          plutil -lint ~/Applications/infind.app/Contents/Info.plist
+          codesign --verify ~/Applications/infind.app && echo signed
+          ls -la ~/Applications/infind.app/Contents/Frameworks ~/Applications/infind.app/Contents/Resources
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
