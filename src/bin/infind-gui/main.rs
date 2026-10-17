@@ -101,6 +101,8 @@ struct App {
     error: Option<String>,
     placed: bool,
     had_focus: bool,
+    /// When the window last lost the keyboard; it closes once that has lasted a moment.
+    unfocused_since: Option<Instant>,
     height: f32,
     home: String,
 }
@@ -162,6 +164,7 @@ impl App {
             error: None,
             placed: false,
             had_focus: false,
+            unfocused_since: None,
             height: FIELD_H,
             home: std::env::var("HOME").unwrap_or_default(),
         }
@@ -443,12 +446,22 @@ impl App {
             }
         }
         // Clicking elsewhere puts the panel away, unless it is waiting on a dialog or listening.
+        // A quarter second's grace lets a passing popup (an input method, a notification)
+        // take the focus without closing it.
         match focused {
-            Some(true) => self.had_focus = true,
-            Some(false) if self.had_focus && !self.picking && self.recording.is_none() => {
-                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            Some(true) => {
+                self.had_focus = true;
+                self.unfocused_since = None;
             }
-            _ => {}
+            Some(false) if self.had_focus && !self.picking && self.recording.is_none() => {
+                let since = *self.unfocused_since.get_or_insert_with(Instant::now);
+                if since.elapsed() > Duration::from_millis(250) {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                } else {
+                    ctx.request_repaint_after(Duration::from_millis(50));
+                }
+            }
+            _ => self.unfocused_since = None,
         }
     }
 
@@ -526,7 +539,9 @@ impl App {
             .background_color(Color32::TRANSPARENT)
             .vertical_align(Align::Center);
         let r = ui.put(edit_rect, edit);
-        if self.view == View::Search {
+        // Take the keyboard only when nothing has it: asking every frame makes the input
+        // method (IBus) drop and re-take the window's focus, and typing stops arriving.
+        if self.view == View::Search && ui.ctx().memory(|m| m.focused().is_none()) {
             r.request_focus();
         }
         if r.changed() {
@@ -933,6 +948,8 @@ impl eframe::App for App {
                 v.selection.bg_fill = p.selected;
                 v.selection.stroke = Stroke::new(1.0, p.text);
                 v.text_cursor.stroke = Stroke::new(2.0, p.accent);
+                // A steady cursor: egui's blink timer repaints the window every frame here.
+                v.text_cursor.blink = false;
                 v.override_text_color = Some(p.text);
             }
             let shadow = egui::epaint::Shadow { offset: [0, 10], blur: 28, spread: 0, color: p.shadow };
