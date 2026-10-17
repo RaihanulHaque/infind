@@ -40,6 +40,7 @@ stop changing. Stop with Ctrl+C. The window does the same thing in the backgroun
 infind search tickets for the Tokyo flight
 infind search -n 20 "connection refused"
 infind search --json invoice | jq '.[0].path'
+infind search --audio question.wav      # a spoken question or a sound, no speech to text
 ```
 
 Prints the best chunk of each file, best first: score, a `*` when every query word occurs
@@ -50,6 +51,7 @@ literally, the path, the page, line or time, and a snippet.
 | `-n`, `--limit` | 10 | number of files to show |
 | `--boost` | 0.15 | score added when the chunk contains every query word |
 | `--json` | off | machine-readable output |
+| `--audio <clip>` | | search with a wav, mp3 or flac clip (30 s at most) instead of words; words given as well only add the exact-match boost |
 
 Scores are cosine similarity, 0 to 1 for related texts. A bare 0.6 is usually a weak
 match; 0.7 and above is usually the thing you meant.
@@ -69,6 +71,11 @@ needs the model.
 Opens the window. Words on the command line become the first query. Only one window runs
 at a time; starting a second one exits silently, so the keyboard shortcut is safe to press
 repeatedly.
+
+The 🎤 button next to the search box records from the default microphone: click it, speak
+or play a sound, and click again (it stops by itself after 30 seconds). The recording is
+searched like `--audio` and deleted afterwards. It uses `arecord` (alsa-utils), or
+`pw-record` (PipeWire) when that is missing.
 
 ## Global flags and environment
 

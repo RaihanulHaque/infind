@@ -86,6 +86,7 @@ SHA-256 check. `infind models` fetches it ahead of time. Use `--mmproj none` to 
 ```bash
 infind index ~/Documents ~/Pictures     # seconds for text, a few seconds per image
 infind search photo of my passport
+infind search --audio question.wav      # search with a sound clip instead of words
 infind-gui                              # or press Ctrl+Super
 ```
 
@@ -102,6 +103,7 @@ Full details are in [docs/usage.md](docs/usage.md).
 | Enter | open the highlighted result (PDFs at the page, media at the second) |
 | Esc | close |
 | right-click a row | Open, Show in folder, Copy path |
+| 🎤 button | click, speak or play a sound, click again: searches with the clip (30 s at most) |
 
 The bottom bar indexes a folder with one click and shows what the folder watcher is
 doing. Folders you have indexed are followed automatically: new, edited and deleted
@@ -135,6 +137,10 @@ Known limits:
   instant up to a few hundred thousand chunks and slows down beyond.
 - **No speech to text yet.** Audio is matched by what it sounds like to the embedding
   model, not by the words spoken. kiln can transcribe; wiring it in is on the roadmap.
+- **Searching by sound is experimental.** The clip itself is embedded, with no speech to
+  text. On a small test (synthetic speech and sound effects) 6 of 8 clips put the right
+  file first, including spoken questions that found text notes; short non-speech sounds
+  all sound alike to the model. The mic button needs `arecord` (alsa-utils) or `pw-record`.
 - **English OCR only.** Install more tesseract language packs and they are not used yet.
 
 ## How it works

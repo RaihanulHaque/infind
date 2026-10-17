@@ -246,7 +246,7 @@ pub fn embed_file(e: &mut Embedder, path: &Path, kind: FileKind, opts: &Options)
     let do_ocr = opts.ocr && extract::have("tesseract");
     match kind {
         FileKind::Image => {
-            if let Some(v) = e.embed_media_file(path)? {
+            if let Some(v) = e.embed_media_file(path, Kind::Document)? {
                 out.push((0, title.clone(), v));
             }
             // Screenshots and photos of documents: also keep the words in them.
@@ -271,7 +271,7 @@ pub fn embed_file(e: &mut Embedder, path: &Path, kind: FileKind, opts: &Options)
             if kind == FileKind::Pdf && !found_text && e.supports_images && opts.images && extract::have("pdftoppm") {
                 let tmp = extract::TempDir::new("pdfimg")?;
                 for (page, img) in extract::render_pdf_pages(path, tmp.path(), 100, extract::PDF_IMAGE_PAGES, true)? {
-                    if let Some(v) = e.embed_media_file(&img)? {
+                    if let Some(v) = e.embed_media_file(&img, Kind::Document)? {
                         out.push((page, title.clone(), v));
                     }
                 }
@@ -288,7 +288,7 @@ pub fn embed_file(e: &mut Embedder, path: &Path, kind: FileKind, opts: &Options)
                     if extract::cut_audio(path, start, extract::AUDIO_WINDOW_SECS, &wav).is_err() {
                         break; // no audio stream
                     }
-                    if let Some(v) = e.embed_media_file(&wav)? {
+                    if let Some(v) = e.embed_media_file(&wav, Kind::Document)? {
                         out.push((start as i64, format!("{title} {}", extract::fmt_time(start)), v));
                     }
                     let _ = std::fs::remove_file(&wav);
@@ -300,7 +300,7 @@ pub fn embed_file(e: &mut Embedder, path: &Path, kind: FileKind, opts: &Options)
                     if extract::cut_frame(path, t, &jpg).is_err() {
                         continue;
                     }
-                    if let Some(v) = e.embed_media_file(&jpg)? {
+                    if let Some(v) = e.embed_media_file(&jpg, Kind::Document)? {
                         out.push((t as i64, format!("{title} {}", extract::fmt_time(t)), v));
                     }
                     let _ = std::fs::remove_file(&jpg);

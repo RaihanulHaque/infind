@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Search by sound: `infind search --audio <clip>` and a 🎤 button in the window that records
+  from the microphone. The clip is embedded directly (no speech to text), wrapped in
+  EmbeddingGemma's query prefix, and ranked against text, images and audio alike.
+- Window: a search typed while another command was queued no longer drops that command.
+
 ## 0.3.0 (2026-10-13)
 
 - kiln is a git submodule built by `cargo build`; no separate build step.

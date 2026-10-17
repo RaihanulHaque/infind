@@ -3,16 +3,20 @@
 
 use eframe::egui::{self, Color32, Key, RichText};
 use infind::embedder::{Embedder, Kind};
+use infind::extract::TempDir;
 use infind::indexer::{self, Event};
 use infind::store::Store;
 use infind::watch::FsWatch;
 use infind::{default_db, locator_label, resolve_model};
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::{Duration, Instant};
 
 enum Cmd {
     Search { seq: u64, text: String },
+    /// Search with a recorded sound clip; the folder holding it goes away once it is embedded.
+    SearchAudio { seq: u64, clip: PathBuf, _dir: TempDir },
     Index(PathBuf),
 }
 
@@ -38,6 +42,32 @@ struct HitView {
     score: f32,
     keyword: bool,
     snippet: String,
+}
+
+/// Ranks the index against a query vector and sends the results for display.
+fn search_and_send(store: &Store, q: &[f32], text: &str, seq: u64, t: Instant, send: &dyn Fn(Msg)) {
+    match store.search(q, text, 20, 0.15) {
+        Ok(hits) => {
+            let hits = hits
+                .into_iter()
+                .map(|h| {
+                    let p = Path::new(&h.path);
+                    HitView {
+                        name: p.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default(),
+                        dir: p.parent().map(|s| s.to_string_lossy().to_string()).unwrap_or_default(),
+                        snippet: h.text.split_whitespace().collect::<Vec<_>>().join(" "),
+                        path: h.path,
+                        kind: h.kind,
+                        locator: h.locator,
+                        score: h.score,
+                        keyword: h.keyword,
+                    }
+                })
+                .collect();
+            send(Msg::Results { seq, hits, ms: t.elapsed().as_millis() });
+        }
+        Err(e) => send(Msg::Error(format!("{e:#}"))),
+    }
 }
 
 fn worker(rx: Receiver<Cmd>, tx: Sender<Msg>, ctx: egui::Context) {
@@ -90,8 +120,14 @@ fn worker(rx: Receiver<Cmd>, tx: Sender<Msg>, ctx: egui::Context) {
         send(Msg::Watch(format!("watching {} folder{}", w.roots().len(), if w.roots().len() == 1 { "" } else { "s" })));
     }
 
+    // A command read while skipping stale searches, handled next.
+    let mut pending: Option<Cmd> = None;
     loop {
-        let cmd = match rx.recv_timeout(Duration::from_millis(300)) {
+        let next = match pending.take() {
+            Some(c) => Ok(c),
+            None => rx.recv_timeout(Duration::from_millis(300)),
+        };
+        let cmd = match next {
             Ok(c) => Some(c),
             Err(mpsc::RecvTimeoutError::Timeout) => None,
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
@@ -117,9 +153,18 @@ fn worker(rx: Receiver<Cmd>, tx: Sender<Msg>, ctx: egui::Context) {
                 // Only the newest query matters; skip the ones that piled up while embedding.
                 let mut seq = seq;
                 let mut text = text;
-                while let Ok(Cmd::Search { seq: s2, text: t2 }) = rx.try_recv() {
-                    seq = s2;
-                    text = t2;
+                loop {
+                    match rx.try_recv() {
+                        Ok(Cmd::Search { seq: s2, text: t2 }) => {
+                            seq = s2;
+                            text = t2;
+                        }
+                        Ok(other) => {
+                            pending = Some(other);
+                            break;
+                        }
+                        Err(_) => break,
+                    }
                 }
                 let t = Instant::now();
                 let q = match emb.embed_text(&text, Kind::Query) {
@@ -133,28 +178,23 @@ fn worker(rx: Receiver<Cmd>, tx: Sender<Msg>, ctx: egui::Context) {
                         continue;
                     }
                 };
-                match store.search(&q, &text, 20, 0.15) {
-                    Ok(hits) => {
-                        let hits = hits
-                            .into_iter()
-                            .map(|h| {
-                                let p = Path::new(&h.path);
-                                HitView {
-                                    name: p.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default(),
-                                    dir: p.parent().map(|s| s.to_string_lossy().to_string()).unwrap_or_default(),
-                                    snippet: h.text.split_whitespace().collect::<Vec<_>>().join(" "),
-                                    path: h.path,
-                                    kind: h.kind,
-                                    locator: h.locator,
-                                    score: h.score,
-                                    keyword: h.keyword,
-                                }
-                            })
-                            .collect();
-                        send(Msg::Results { seq, hits, ms: t.elapsed().as_millis() });
+                search_and_send(&store, &q, &text, seq, t, &send);
+            }
+            Cmd::SearchAudio { seq, clip, _dir } => {
+                let t = Instant::now();
+                let q = match emb.embed_media_file(&clip, Kind::Query) {
+                    Ok(Some(q)) => q,
+                    Ok(None) => {
+                        send(Msg::Error("clip too long".into()));
+                        continue;
                     }
-                    Err(e) => send(Msg::Error(format!("{e:#}"))),
-                }
+                    Err(e) => {
+                        send(Msg::Error(format!("{e:#}")));
+                        continue;
+                    }
+                };
+                // No words, so no exact-match boost: the clip's meaning alone ranks.
+                search_and_send(&store, &q, "", seq, t, &send);
             }
             Cmd::Index(root) => {
                 let r = indexer::index(&mut store, &mut emb, &model_name, &[root.clone()], &opts, |ev| {
@@ -186,6 +226,65 @@ fn worker(rx: Receiver<Cmd>, tx: Sender<Msg>, ctx: egui::Context) {
     }
 }
 
+/// Longest clip recorded: the model hears 30 seconds at a time.
+const MAX_CLIP: Duration = Duration::from_secs(30);
+
+/// A microphone recording in progress: arecord or pw-record writing a 16 kHz mono wav.
+struct Recording {
+    child: std::process::Child,
+    /// Taken by `finish`; while still here, dropping the recording discards it.
+    dir: Option<TempDir>,
+    started: Instant,
+}
+
+impl Recording {
+    fn start() -> Result<Self, String> {
+        let dir = TempDir::new("mic").map_err(|e| format!("{e:#}"))?;
+        let wav = dir.path().join("clip.wav");
+        let tries: [(&str, &[&str]); 2] = [
+            ("arecord", &["-q", "-f", "S16_LE", "-r", "16000", "-c", "1"]),
+            ("pw-record", &["--rate", "16000", "--channels", "1", "--format", "s16"]),
+        ];
+        for (prog, args) in tries {
+            let spawned = Command::new(prog)
+                .args(args)
+                .arg(&wav)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn();
+            if let Ok(child) = spawned {
+                return Ok(Self { child, dir: Some(dir), started: Instant::now() });
+            }
+        }
+        Err("cannot record: install alsa-utils (arecord) or pipewire (pw-record)".into())
+    }
+
+    /// Stops the recorder as Ctrl+C would, so it finishes the wav, and returns the clip.
+    fn finish(mut self) -> Result<(PathBuf, TempDir), String> {
+        let _ = Command::new("kill").arg("-INT").arg(self.child.id().to_string()).status();
+        let _ = self.child.wait();
+        let dir = self.dir.take().expect("finished once");
+        let wav = dir.path().join("clip.wav");
+        // 16 kHz, 16-bit mono: under a third of a second is a click, not a query.
+        let bytes = std::fs::metadata(&wav).map(|m| m.len()).unwrap_or(0);
+        if bytes < 10_000 {
+            return Err("nothing recorded: check the microphone".into());
+        }
+        Ok((wav, dir))
+    }
+}
+
+impl Drop for Recording {
+    /// Closing the window while listening must not leave the recorder running.
+    fn drop(&mut self) {
+        if self.child.try_wait().ok().flatten().is_none() {
+            let _ = self.child.kill();
+            let _ = self.child.wait();
+        }
+    }
+}
+
 struct App {
     tx: Sender<Cmd>,
     rx: Receiver<Msg>,
@@ -200,6 +299,10 @@ struct App {
     counts: (i64, i64),
     ready: bool,
     images: bool,
+    audio: bool,
+    recording: Option<Recording>,
+    /// Shown in the empty search box after a search by sound, e.g. "4 s recording".
+    clip_label: Option<String>,
     index_path: String,
     progress: String,
     watch_status: String,
@@ -236,6 +339,9 @@ impl App {
             counts: (0, 0),
             ready: false,
             images: false,
+            audio: false,
+            recording: None,
+            clip_label: None,
             index_path: home,
             progress: String::new(),
             watch_status: String::new(),
@@ -261,12 +367,39 @@ impl App {
         let _ = self.tx.send(Cmd::Search { seq: self.seq, text: q });
     }
 
+    /// Starts recording, or stops it and searches with what was heard.
+    fn toggle_mic(&mut self) {
+        let Some(rec) = self.recording.take() else {
+            match Recording::start() {
+                Ok(r) => {
+                    self.recording = Some(r);
+                    self.error = None;
+                }
+                Err(e) => self.error = Some(e),
+            }
+            return;
+        };
+        let secs = rec.started.elapsed().as_secs_f32();
+        match rec.finish() {
+            Ok((clip, dir)) => {
+                self.seq += 1;
+                self.query.clear();
+                self.last_sent.clear();
+                self.changed_at = None;
+                self.clip_label = Some(format!("{secs:.0} s recording"));
+                let _ = self.tx.send(Cmd::SearchAudio { seq: self.seq, clip, _dir: dir });
+            }
+            Err(e) => self.error = Some(e),
+        }
+    }
+
     fn drain(&mut self) {
         while let Ok(m) = self.rx.try_recv() {
             match m {
                 Msg::Ready { backend, images, audio } => {
                     self.ready = true;
                     self.images = images;
+                    self.audio = audio;
                     let media = match (images, audio) {
                         (true, true) => ", images and audio on",
                         (true, false) => ", images on",
@@ -357,13 +490,45 @@ impl eframe::App for App {
             }
         }
 
+        if let Some(rec) = &self.recording {
+            if rec.started.elapsed() >= MAX_CLIP {
+                self.toggle_mic();
+            } else {
+                ctx.request_repaint_after(Duration::from_millis(200));
+            }
+        }
+
         egui::Panel::top("search").show(root, |ui| {
             ui.add_space(8.0);
-            let edit = egui::TextEdit::singleline(&mut self.query)
-                .hint_text("Describe what you are looking for…")
-                .font(egui::TextStyle::Heading)
-                .desired_width(f32::INFINITY);
-            let r = ui.add(edit);
+            let hint = match (&self.recording, &self.clip_label) {
+                (Some(_), _) => "Listening… click ⏹ to search with what you said or played".to_string(),
+                (None, Some(c)) => format!("Results for a {c}. Type to search with words again."),
+                (None, None) => "Describe what you are looking for…".to_string(),
+            };
+            let mic_w = 44.0;
+            let (r, mic) = ui.horizontal(|ui| {
+                let edit = egui::TextEdit::singleline(&mut self.query)
+                    .hint_text(hint)
+                    .font(egui::TextStyle::Heading)
+                    .desired_width(ui.available_width() - mic_w - ui.spacing().item_spacing.x);
+                let r = ui.add(edit);
+                let label = match &self.recording {
+                    Some(rec) => format!("⏹ {}s", rec.started.elapsed().as_secs()),
+                    None => "🎤".to_string(),
+                };
+                let mic = ui
+                    .add_enabled(
+                        self.ready && self.audio,
+                        egui::Button::new(RichText::new(label).heading()).min_size(egui::vec2(mic_w, 0.0)),
+                    )
+                    .on_hover_text("Search with your voice or a sound: click, speak or play it, click again (30 s at most)")
+                    .on_disabled_hover_text("Needs the model's audio encoder");
+                (r, mic)
+            })
+            .inner;
+            if mic.clicked() {
+                self.toggle_mic();
+            }
             if !self.ready {
                 r.request_focus();
             } else if ctx.memory(|m| m.focused().is_none()) {
@@ -371,6 +536,7 @@ impl eframe::App for App {
             }
             if r.changed() {
                 self.changed_at = Some(Instant::now());
+                self.clip_label = None;
             }
             if r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
                 let settled = self.changed_at.is_none() && self.query.trim() == self.last_sent;

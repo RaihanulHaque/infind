@@ -12,6 +12,8 @@ pub struct Embedder {
     ctx: *mut kiln_context,
     pub dims: usize,
     pub backend: String,
+    /// llama.cpp architecture name, e.g. "gemma-embedding2".
+    pub arch: String,
     pub has_projector: bool,
     pub supports_images: bool,
     pub supports_audio: bool,
@@ -101,6 +103,7 @@ impl Embedder {
             ctx,
             dims: info.n_embd as usize,
             backend: fixed(&info.backend_name),
+            arch: fixed(&info.arch),
             has_projector,
             supports_images: pinfo.supports_images,
             supports_audio: pinfo.supports_audio,
@@ -135,18 +138,32 @@ impl Embedder {
         Ok(Some(out))
     }
 
-    /// Embeds one image or audio file alone (no text). Needs a projector.
-    pub fn embed_media_file(&mut self, path: &Path) -> Result<Option<Vec<f32>>> {
+    /// The text a media query is wrapped in. kiln adds no task prefix when media are present,
+    /// but EmbeddingGemma ranks a clip used as a query better with its query prefix around it.
+    fn media_query_text(&self) -> Option<String> {
+        self.arch
+            .starts_with("gemma-embedding")
+            .then(|| format!("task: search result | query: {KILN_MEDIA_MARKER}"))
+    }
+
+    /// Embeds one image or audio file alone. As a Document it is stored as is; as a Query
+    /// (a sound clip to search with) it gets the model's query prefix. Needs a projector.
+    pub fn embed_media_file(&mut self, path: &Path, kind: Kind) -> Result<Option<Vec<f32>>> {
         if !self.has_projector {
             bail!("no projector loaded; pass --mmproj to embed images and audio");
         }
         let c = cstr(&path.to_string_lossy())?;
         let media = kiln_media { path: c.as_ptr(), data: ptr::null(), size: 0 };
+        let text = match kind {
+            Kind::Query => self.media_query_text().map(|t| cstr(&t)).transpose()?,
+            Kind::Document => None,
+        };
+        let text_ptr = text.as_ref().map(|t| t.as_ptr()).unwrap_or(ptr::null());
         let mut out = vec![0f32; self.dims];
-        let o = Self::opts(Kind::Document);
+        let o = Self::opts(kind);
         let mut st = kiln_embed_stats::default();
         let s = unsafe {
-            kiln_embed_media(self.ctx, ptr::null(), &media, 1, &o, out.as_mut_ptr(), self.dims as i32, &mut st)
+            kiln_embed_media(self.ctx, text_ptr, &media, 1, &o, out.as_mut_ptr(), self.dims as i32, &mut st)
         };
         self.last_stats = st;
         if s == KILN_ERR_CONTEXT_FULL {

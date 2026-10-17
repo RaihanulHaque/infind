@@ -96,6 +96,9 @@ pub struct kiln_projector_info {
     pub supports_audio: bool,
 }
 
+/// Where a media item goes inside the text given to kiln_embed_media.
+pub const KILN_MEDIA_MARKER: &str = "<__media__>";
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct kiln_media {

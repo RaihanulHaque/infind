@@ -76,6 +76,10 @@ enum Cmd {
         boost: f32,
         #[arg(long)]
         json: bool,
+        /// Search with a sound clip (wav, mp3, flac) instead of words: the clip itself is
+        /// embedded, no speech-to-text. Words given too are only used for the exact-match boost.
+        #[arg(long)]
+        audio: Option<PathBuf>,
     },
     /// Show what is in the index
     Status,
@@ -95,7 +99,9 @@ fn main() -> Result<()> {
             println!("folder:    {}", models::models_dir().display());
             Ok(())
         }
-        Cmd::Search { query, limit, boost, json } => search(&cli, &db, &query.join(" "), *limit, *boost, *json),
+        Cmd::Search { query, limit, boost, json, audio } => {
+            search(&cli, &db, &query.join(" "), audio.as_deref(), *limit, *boost, *json)
+        }
         Cmd::Index { paths, kinds, force } => index(&cli, &db, paths, kinds.options(*force)),
         Cmd::Watch { paths, kinds } => watch(&cli, &db, paths, kinds.options(false)),
     }
@@ -158,14 +164,22 @@ fn load_embedder(cli: &Cli, want_media: bool) -> Result<(Embedder, PathBuf)> {
     Ok((e, model))
 }
 
-fn search(cli: &Cli, db: &Path, query: &str, limit: usize, boost: f32, json: bool) -> Result<()> {
-    if query.trim().is_empty() {
+fn search(cli: &Cli, db: &Path, query: &str, audio: Option<&Path>, limit: usize, boost: f32, json: bool) -> Result<()> {
+    if query.trim().is_empty() && audio.is_none() {
         bail!("give a query, e.g. infind search invoice from march");
     }
     let store = Store::open(db)?;
-    let (mut e, _) = load_embedder(cli, false)?;
+    let (mut e, _) = load_embedder(cli, audio.is_some())?;
     let t = Instant::now();
-    let q = e.embed_text(query, Kind::Query)?.context("query too long")?;
+    let q = match audio {
+        Some(clip) => {
+            if !e.supports_audio {
+                bail!("the loaded projector cannot read audio");
+            }
+            e.embed_media_file(clip, Kind::Query)?.context("clip too long for the context (keep it under ~30 s)")?
+        }
+        None => e.embed_text(query, Kind::Query)?.context("query too long")?,
+    };
     let embed_ms = t.elapsed().as_millis();
     let t = Instant::now();
     let hits = store.search(&q, query, limit, boost)?;
