@@ -9,6 +9,8 @@
   grouped by kind with thumbnails, a preview pane (image, PDF page, video frame at the moment,
   passage with the query's words marked), weaker matches folded away, Ctrl+Enter to show in
   folder, a Folders view with the desktop's folder dialog, light and dark mode, Inter typeface.
+- Remove a folder: `infind forget <folder>`, and Remove (or right-click) in the window's
+  Folders view. Files another indexed folder still covers stay in the index.
 - Window: a search typed while another command was queued no longer drops that command.
 - Window: a recorder that ignores Ctrl+C is stopped with SIGTERM, then killed, instead of
   hanging the window.

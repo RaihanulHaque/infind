@@ -56,6 +56,16 @@ literally, the path, the page, line or time, and a snippet.
 Scores are cosine similarity, 0 to 1 for related texts. A bare 0.6 is usually a weak
 match; 0.7 and above is usually the thing you meant.
 
+### `infind forget <folder>...`
+
+Stops searching a folder: it is no longer followed, and its files are dropped from the
+index unless another indexed folder still covers them. The files themselves are not
+touched. The window's Folders view does the same with Remove.
+
+```bash
+infind forget ~/Downloads
+```
+
 ### `infind status`
 
 Shows the index file, the model it was built with, counts by kind and the folders followed.

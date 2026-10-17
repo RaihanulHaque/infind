@@ -101,6 +101,24 @@ impl Store {
         Ok(())
     }
 
+    /// Stops searching a folder: forgets it and every file under it that no other indexed
+    /// folder covers. The files themselves are not touched. Returns how many were forgotten.
+    pub fn remove_root(&mut self, root: &str) -> Result<usize> {
+        let rest: Vec<String> = self.roots().into_iter().filter(|r| r != root).collect();
+        let covered = |p: &str| rest.iter().any(|r| p == r || p.starts_with(&format!("{}/", r.trim_end_matches('/'))));
+        let gone: Vec<String> = self.files_under(root)?.into_iter().filter(|p| !covered(p)).collect();
+        let tx = self.conn.transaction()?;
+        for p in &gone {
+            tx.execute("DELETE FROM files WHERE path = ?1", [p])?;
+        }
+        tx.execute(
+            "INSERT INTO meta(key, value) VALUES ('roots', ?1) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            [serde_json::to_string(&rest)?],
+        )?;
+        tx.commit()?;
+        Ok(gone.len())
+    }
+
     pub fn file(&self, path: &str) -> Result<Option<FileRow>> {
         Ok(self
             .conn
@@ -310,6 +328,24 @@ mod tests {
         s.add_root("/home/x").unwrap();
         s.add_root("/data").unwrap();
         assert_eq!(s.roots(), vec!["/home/x".to_string(), "/data".to_string()]);
+        let _ = std::fs::remove_file(p);
+    }
+
+    #[test]
+    fn removing_a_folder_keeps_files_another_folder_covers() {
+        let (mut s, p) = temp_store("forget");
+        for f in ["/h/d/a.txt", "/h/d/t/b.txt", "/h/e/c.txt"] {
+            s.put_file(f, "text", 1, 1, &[(1, "hello there".into(), unit(&[1.0]))]).unwrap();
+        }
+        for r in ["/h/d", "/h/d/t", "/h/e"] {
+            s.add_root(r).unwrap();
+        }
+        // The parent goes; its subfolder is still indexed on its own.
+        assert_eq!(s.remove_root("/h/d").unwrap(), 1);
+        assert_eq!(s.roots(), vec!["/h/d/t".to_string(), "/h/e".to_string()]);
+        assert!(s.file("/h/d/a.txt").unwrap().is_none());
+        assert!(s.file("/h/d/t/b.txt").unwrap().is_some());
+        assert_eq!(s.counts().unwrap().1, 2);
         let _ = std::fs::remove_file(p);
     }
 

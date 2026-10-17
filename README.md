@@ -110,7 +110,7 @@ light or dark mode and puts itself away when you click elsewhere.
 | Esc | close (or leave the Folders view) |
 | right-click a row | Open, Show in folder, Copy path |
 | 🎤 button | click, speak or play a sound, then click again or press Enter: searches with the clip (30 s at most) |
-| folder button | the folders being searched: add one (the desktop's folder dialog), or update one now |
+| folder button | the folders being searched: add one (the desktop's folder dialog), update one now, or remove one (also on right-click) |
 
 Folders you have indexed are followed automatically: new, edited and deleted files update
 the index within a couple of seconds.

@@ -96,6 +96,8 @@ struct App {
     progress: String,
     watch_status: String,
     picking: bool,
+    /// The folder whose Remove was clicked once; a second click removes it.
+    confirm_remove: Option<String>,
     /// No folder dialog on this desktop: a path is typed instead.
     manual_path: Option<String>,
     error: Option<String>,
@@ -160,6 +162,7 @@ impl App {
             progress: String::new(),
             watch_status: String::new(),
             picking: false,
+            confirm_remove: None,
             manual_path: None,
             error: None,
             placed: false,
@@ -824,6 +827,8 @@ impl App {
         );
         let list = Rect::from_min_max(rect.min + vec2(0.0, 54.0), pos2(rect.right(), rect.bottom() - 96.0));
         let mut update: Option<String> = None;
+        let mut remove: Option<String> = None;
+        let mut confirm: Option<Option<String>> = None;
         ui.scope_builder(UiBuilder::new().max_rect(list), |ui| {
             egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
                 ui.spacing_mut().item_spacing = vec2(0.0, 2.0);
@@ -832,20 +837,66 @@ impl App {
                     ui.label(RichText::new("None yet.").color(p.tertiary));
                 }
                 for root in &self.roots {
-                    let (r, resp) = ui.allocate_exact_size(vec2(w, 34.0), Sense::hover());
+                    let (r, resp) = ui.allocate_exact_size(vec2(w, 34.0), Sense::click());
                     if resp.hovered() {
                         ui.painter().rect_filled(r, 8.0, p.hover);
                     }
                     look::paint(ui.painter(), Rect::from_center_size(pos2(r.left() + 18.0, r.center().y), vec2(18.0, 18.0)), Icon::Folder, p.secondary);
-                    text_line(ui.painter(), pos2(r.left() + 38.0, r.center().y - 8.0), &self.short_dir(root), regular(13.0), p.text, w - 140.0);
-                    let b = Rect::from_min_max(pos2(r.right() - 84.0, r.top() + 5.0), pos2(r.right() - 6.0, r.bottom() - 5.0));
-                    let br = ui.put(b, egui::Button::new(RichText::new("Update").size(12.0)).fill(p.chip).corner_radius(6.0));
-                    if br.on_hover_text("Read new and changed files now").clicked() {
+                    text_line(ui.painter(), pos2(r.left() + 38.0, r.center().y - 8.0), &self.short_dir(root), regular(13.0), p.text, w - 220.0);
+                    let asking = self.confirm_remove.as_deref() == Some(root.as_str());
+                    let rb = Rect::from_min_max(pos2(r.right() - 84.0, r.top() + 5.0), pos2(r.right() - 6.0, r.bottom() - 5.0));
+                    let (label, fill, color) = if asking {
+                        ("Remove?", p.danger, Color32::WHITE)
+                    } else {
+                        ("Remove", p.chip, p.text)
+                    };
+                    let removed = ui.put(rb, egui::Button::new(RichText::new(label).size(12.0).color(color)).fill(fill).corner_radius(6.0));
+                    let tip = if asking {
+                        "Click again to stop searching this folder. Your files are not touched."
+                    } else {
+                        "Stop searching this folder"
+                    };
+                    if removed.on_hover_text(tip).clicked() {
+                        if asking {
+                            remove = Some(root.clone());
+                        } else {
+                            confirm = Some(Some(root.clone()));
+                        }
+                    }
+                    let ub = rb.translate(vec2(-86.0, 0.0));
+                    let ur = ui.put(ub, egui::Button::new(RichText::new("Update").size(12.0)).fill(p.chip).corner_radius(6.0));
+                    if ur.on_hover_text("Read new and changed files now").clicked() {
                         update = Some(root.clone());
+                    }
+                    resp.context_menu(|ui| {
+                        if ui.button("Update now").clicked() {
+                            update = Some(root.clone());
+                            ui.close();
+                        }
+                        if ui.button("Open folder").clicked() {
+                            let _ = open::that_detached(root);
+                            ui.close();
+                        }
+                        ui.separator();
+                        if ui.button("Remove from infind").clicked() {
+                            remove = Some(root.clone());
+                            ui.close();
+                        }
+                    });
+                    if resp.clicked() {
+                        confirm = Some(None);
                     }
                 }
             });
         });
+        if let Some(c) = confirm {
+            self.confirm_remove = c;
+        }
+        if let Some(r) = remove {
+            self.confirm_remove = None;
+            self.progress = format!("Removing {}…", self.short_dir(&r));
+            let _ = self.tx.send(Cmd::Forget(r));
+        }
         if let Some(r) = update {
             if !self.indexing {
                 self.index(PathBuf::from(r));
@@ -889,7 +940,8 @@ impl App {
         painter.hline(rect.x_range(), rect.top(), Stroke::new(1.0, p.line));
         let mid = rect.center().y;
         let summary = if self.view == View::Folders {
-            format!("{} folders · {} files", self.roots.len(), self.counts.0)
+            let n = self.roots.len();
+            format!("{n} folder{} · {} files", if n == 1 { "" } else { "s" }, self.counts.0)
         } else if !self.hits.is_empty() {
             let mut s = vec![];
             if let Some(c) = &self.clip_label {

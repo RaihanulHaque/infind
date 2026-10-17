@@ -19,6 +19,8 @@ pub enum Cmd {
     /// Search with a recorded sound clip; the folder holding it goes away once it is embedded.
     SearchAudio { seq: u64, clip: PathBuf, _dir: TempDir },
     Index(PathBuf),
+    /// Stop searching a folder and forget its files.
+    Forget(String),
 }
 
 pub enum Msg {
@@ -204,6 +206,21 @@ pub fn worker(rx: Receiver<Cmd>, tx: Sender<Msg>, ctx: egui::Context) {
                 };
                 // No words, so no exact-match boost: the clip's meaning alone ranks.
                 search_and_send(&store, &q, "", seq, t, &send);
+            }
+            Cmd::Forget(root) => {
+                match store.remove_root(&root) {
+                    Ok(n) => send(Msg::Progress(format!("done: removed {root} ({n} files)"))),
+                    Err(e) => send(Msg::Error(format!("{e:#}"))),
+                }
+                if let Ok((f, c, _)) = store.counts() {
+                    send(Msg::Counts { files: f, chunks: c });
+                }
+                send(Msg::Roots(store.roots()));
+                watch = rewatch(&store);
+                match &watch {
+                    Some(w) => send(watching(w)),
+                    None => send(Msg::Watch(String::new())),
+                }
             }
             Cmd::Index(root) => {
                 let r = indexer::index(&mut store, &mut emb, &model_name, &[root.clone()], &opts, |ev| {

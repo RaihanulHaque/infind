@@ -81,6 +81,8 @@ enum Cmd {
         #[arg(long)]
         audio: Option<PathBuf>,
     },
+    /// Stop searching folders: forget them and their files (the files themselves are not touched)
+    Forget { paths: Vec<PathBuf> },
     /// Show what is in the index
     Status,
     /// Download the embedding model now (otherwise it is fetched the first time it is needed)
@@ -92,6 +94,7 @@ fn main() -> Result<()> {
     let db = cli.db.clone().unwrap_or_else(default_db);
     match &cli.cmd {
         Cmd::Status => status(&db),
+        Cmd::Forget { paths } => forget(&db, paths),
         Cmd::Models => {
             let (m, p) = resolve(&cli, true)?;
             println!("model:     {}", m.display());
@@ -123,6 +126,24 @@ fn status(db: &Path) -> Result<()> {
         for r in roots {
             println!("  {r}");
         }
+    }
+    Ok(())
+}
+
+fn forget(db: &Path, paths: &[PathBuf]) -> Result<()> {
+    if paths.is_empty() {
+        bail!("name a folder, e.g. infind forget ~/Downloads (infind status lists them)");
+    }
+    let mut store = Store::open(db)?;
+    for p in paths {
+        // The folder may be gone already; then match it as written.
+        let root = p.canonicalize().unwrap_or_else(|_| p.clone());
+        let root = root.to_string_lossy().trim_end_matches('/').to_string();
+        if !store.roots().contains(&root) {
+            bail!("{root} is not an indexed folder (infind status lists them)");
+        }
+        let n = store.remove_root(&root)?;
+        println!("forgot {root} ({n} files)");
     }
     Ok(())
 }
