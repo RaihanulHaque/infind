@@ -938,10 +938,6 @@ impl eframe::App for App {
             let shadow = egui::epaint::Shadow { offset: [0, 10], blur: 28, spread: 0, color: p.shadow };
             ui.painter().add(shadow.as_shape(panel, RADIUS));
             ui.painter().rect(panel, RADIUS, p.surface, Stroke::new(1.0, p.line), StrokeKind::Inside);
-            // The panel's background moves the window.
-            if ui.interact(panel, Id::new("panel-drag"), Sense::drag()).drag_started() {
-                ctx.send_viewport_cmd(egui::ViewportCommand::StartDrag);
-            }
             ui.scope_builder(UiBuilder::new().max_rect(panel), |ui| {
                 let field = Rect::from_min_size(panel.min, vec2(PANEL_W, FIELD_H));
                 self.field(ui, field, &p);
@@ -1140,16 +1136,26 @@ fn show_in_folder(h: &HitView) {
 }
 
 fn main() -> eframe::Result {
-    // One window at a time: a second launch from the hotkey just exits.
+    // One window at a time, and the shortcut toggles it: a second launch closes the open
+    // window (whose process id is in the lock file) and exits.
     let lock_path = default_db().with_file_name("gui.lock");
     if let Some(p) = lock_path.parent() {
         std::fs::create_dir_all(p).ok();
     }
-    let lock = std::fs::File::create(&lock_path).ok();
+    let lock = std::fs::OpenOptions::new().read(true).write(true).create(true).truncate(false).open(&lock_path).ok();
     if let Some(f) = &lock {
         if f.try_lock().is_err() {
+            if let Ok(pid) = std::fs::read_to_string(&lock_path) {
+                let pid = pid.trim();
+                if !pid.is_empty() && pid.chars().all(|c| c.is_ascii_digit()) {
+                    let _ = std::process::Command::new("kill").arg(pid).status();
+                }
+            }
             return Ok(());
         }
+        use std::io::Write;
+        let _ = f.set_len(0);
+        let _ = (&*f).write_all(std::process::id().to_string().as_bytes());
     }
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -1158,7 +1164,6 @@ fn main() -> eframe::Result {
             .with_decorations(false)
             .with_transparent(true)
             .with_resizable(false)
-            .with_window_level(egui::WindowLevel::AlwaysOnTop)
             .with_inner_size(vec2(PANEL_W, FIELD_H) + vec2(MARGIN, MARGIN) * 2.0),
         centered: true,
         ..Default::default()
