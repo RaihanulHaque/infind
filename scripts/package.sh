@@ -16,7 +16,7 @@ rm -rf "$out"
 install -d "$out/bin" "$out/lib" "$out/assets"
 install -m755 target/release/infind target/release/infind-gui "$out/bin/"
 if [[ $os == macos ]]; then
-  cp -P target/release/libkiln*.dylib "$out/lib/"
+  install -m755 target/release/libkiln.0.dylib "$out/lib/"
 else
   install -m755 target/release/libkiln.so.0 "$out/lib/"
 fi

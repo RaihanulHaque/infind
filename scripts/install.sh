@@ -36,7 +36,7 @@ if [[ "$(uname -s)" == Darwin ]]; then
   rm -rf "$app"
   install -d "$app/Contents/MacOS" "$app/Contents/Frameworks" "$app/Contents/Resources" "$bin"
   install -m755 "$src_bin/infind" "$src_bin/infind-gui" "$app/Contents/MacOS/"
-  cp -P "$src_lib"/libkiln*.dylib "$app/Contents/Frameworks/"
+  install -m755 "$src_lib/libkiln.0.dylib" "$app/Contents/Frameworks/"
   sed "s|@VERSION@|${ver:-0}|" "$root/assets/Info.plist" > "$app/Contents/Info.plist"
   # The icon, when the system can turn the SVG into PNGs (Quick Look) and an icon set.
   tmp="$(mktemp -d)"
